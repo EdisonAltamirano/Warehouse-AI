@@ -14,6 +14,8 @@ from GPyOpt.methods import BayesianOptimization
 from bayesOpt import *
 import datetime
 import distutils.util
+from pyModbusTCP.client import ModbusClient
+import time
 # import firebase_admin
 # from firebase_admin import credentials
 # from firebase_admin import db
@@ -87,6 +89,13 @@ class Player(object):
         # cred = credentials.Certificate("google_services.json")
         # firebase_admin.initialize_app(cred)
         # self.db = firestore.client()
+        #1:MissionStatus 0-Charge, 1-Move, 2-Free
+        #2: #Goalx
+        #3: #Goaly
+        #4: Battery
+        #5: RobotStatus 0-Charging, 1:Moving, 2:Free,3-Success,4-Failure
+        #6: Distance
+        self.inforobot=[0,0,0,0,0,0]
 
     def update_position(self, x, y):
         # if self.position[-1][0] != x or self.position[-1][1] != y:
@@ -107,6 +116,7 @@ class Player(object):
             #print("Comiiii")
         if np.array_equal(move, [0, 0, 1]):
             # print("Free robot")
+            self.inforobot[0]=2
             # move_array = self.x_change, self.y_change
             # self.x_change, self.y_change = move_array
             # self.x = x + self.x_change
@@ -123,12 +133,17 @@ class Player(object):
 
         elif np.array_equal(move, [0, 1, 0]):  # right - going horizontal
             #Moving robot
+            self.inforobot[0]=1
+            #Goalx,y
+            self.inforobot[1]=food.x_food
+            self.inforobot[2]=food.y_food
             self.image=pygame.image.load('img/snakeBody.png')
             #Assume time navigationSS
             #Reduce Battery
-            #Update location to objective
-            self.x = food.x_food -20    
-            self.y = food.y_food -20 
+            #Update location to objective if success 
+            if(self.inforobot[5]==3):
+                self.x = food.x_food -20    
+                self.y = food.y_food -20 
             self.status=1
             # doc_ref.update({
             # u'mission': "Move"
@@ -136,6 +151,7 @@ class Player(object):
             #move_array = [0, self.x_change]
         elif np.array_equal(move, [1, 0, 0]) :  # right - going vertical
             #Charging robot
+            self.inforobot[0]=0
             self.image=pygame.image.load('img/redBody.png')
             #Add energy
             self.status=2
@@ -314,6 +330,11 @@ def run(params):
     record = 0
     total_score = 0
     info = {"stop": False,"robot1":"player1"}
+    SERVER_HOST = "127.0.0.1"
+    SERVER_PORT = 12345
+    c = ModbusClient()
+    c.host(SERVER_HOST)
+    c.port(SERVER_PORT)
     # thread = threading.Thread(target=worker, args=(info,))
     while counter_games < params['episodes']and total_score<=200:
         for event in pygame.event.get():
@@ -336,8 +357,22 @@ def run(params):
         steps = 0       # steps since the last positive reward
         player1.battery=100
         while ((not game.crash) and (steps < 200))and game.score<=200:
-
+            
             #thread.start()
+            
+            if not c.is_open():
+                if not c.open():
+                    print("unable to connect to "+SERVER_HOST+":"+str(SERVER_PORT))
+            if c.is_open():
+                #Read Battery / RobotStatus /Distance (Modbus)
+                bits = c.read_holding_registers(0, 6)
+                player1.inforobot[3] = bits[3]
+                player1.inforobot[4] = bits[4]
+                player1.inforobot[5] = bits[5]
+                time.sleep(1)
+                #Update registers MissionStatus,Goalx,Goaly
+                c.write_multiple_registers(0,[player1.inforobot[0],player1.inforobot[1],player1.inforobot[2]])
+                time.sleep(1)
             game.steps = steps
             if not params['train']:
                 agent.epsilon = 0.1
