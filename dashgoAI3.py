@@ -96,6 +96,9 @@ class Player(object):
         #5: RobotStatus 0-Charging, 1:Moving, 2:Free,3-Success,4-Failure
         #6: Distance
         self.inforobot=[0,0,0,0,0,0]
+        self.objectives=[[6563,2330],[13525,3526]]
+        self.charge=[7054,5836]
+        self.changeobjective=0
 
     def update_position(self, x, y):
         # if self.position[-1][0] != x or self.position[-1][1] != y:
@@ -135,8 +138,13 @@ class Player(object):
             #Moving robot
             self.inforobot[0]=1
             #Goalx,y
-            self.inforobot[1]=food.x_food
-            self.inforobot[2]=food.y_food
+            if self.changeobjective<=1:
+                self.inforobot[1]=self.objectives[0][0]
+                self.inforobot[2]=self.objectives[0][1]
+                if self.changeobjective==1:
+                    self.changeobjective=0
+
+
             self.image=pygame.image.load('img/snakeBody.png')
             #Assume time navigationSS
             #Reduce Battery
@@ -144,6 +152,8 @@ class Player(object):
             if(self.inforobot[5]==3):
                 self.x = food.x_food -20    
                 self.y = food.y_food -20 
+
+
             self.status=1
             # doc_ref.update({
             # u'mission': "Move"
@@ -152,6 +162,8 @@ class Player(object):
         elif np.array_equal(move, [1, 0, 0]) :  # right - going vertical
             #Charging robot
             self.inforobot[0]=0
+            self.inforobot[1]=self.charge[0]
+            self.inforobot[2]=self.charge[1]
             self.image=pygame.image.load('img/redBody.png')
             #Add energy
             self.status=2
@@ -330,7 +342,7 @@ def run(params):
     record = 0
     total_score = 0
     info = {"stop": False,"robot1":"player1"}
-    SERVER_HOST = "127.0.0.1"
+    SERVER_HOST = "10.23.70.159"
     SERVER_PORT = 12345
     c = ModbusClient()
     c.host(SERVER_HOST)
@@ -356,10 +368,7 @@ def run(params):
         #pygame.time.wait(1000)
         steps = 0       # steps since the last positive reward
         player1.battery=100
-        while ((not game.crash) and (steps < 200))and game.score<=200:
-            
-            #thread.start()
-            
+        while ((not game.crash) and (steps < 240))and game.score<=200:
             if not c.is_open():
                 if not c.open():
                     print("unable to connect to "+SERVER_HOST+":"+str(SERVER_PORT))
@@ -370,49 +379,50 @@ def run(params):
                 player1.inforobot[4] = bits[4]
                 player1.inforobot[5] = bits[5]
                 time.sleep(1)
+                print(bits)
                 #Update registers MissionStatus,Goalx,Goaly
                 c.write_multiple_registers(0,[player1.inforobot[0],player1.inforobot[1],player1.inforobot[2]])
                 time.sleep(1)
             game.steps = steps
-            if not params['train']:
-                agent.epsilon = 0.1
-            else:
-                # agent.epsilon is set to give randomness to actions
-                agent.epsilon = 1 - (counter_games * params['epsilon_decay_linear'])
-
-            # get old state
-            state_old = agent.get_state(game, player1, food1)
-
-            # perform random actions based on agent.epsilon, or choose the action
-            if random.uniform(0, 1) < agent.epsilon:
-                final_move = np.eye(3)[randint(0,2)]
-            else:
-                # predict action based on the old state
-                with torch.no_grad():
-                    state_old_tensor = torch.tensor(state_old.reshape((1, 4)), dtype=torch.float32).to(DEVICE)
-                    prediction = agent(state_old_tensor)
-                    final_move = np.eye(3)[np.argmax(prediction.detach().cpu().numpy()[0])]
-                    # print("Prediction")
-                    # print(final_move)
-
             # perform new move and get new state
-            player1.do_move(final_move, player1.x, player1.y, game, food1, agent)
-            state_new = agent.get_state(game, player1, food1)
+            if player1.inforobot[5] == 3 or player1.inforobot[5]==4 or steps==0:#Failure or success then other move and set step to 0
+                if not params['train']:
+                    agent.epsilon = 0.1
+                else:
+                    # agent.epsilon is set to give randomness to actions
+                    agent.epsilon = 1 - (counter_games * params['epsilon_decay_linear'])
 
-            # set reward for the new state
-            reward = agent.set_reward(player1, game.crash)
-            
-            # if food is eaten, steps is set to 0
-            if reward > 0:
-                steps = 0
+                # get old state
+                state_old = agent.get_state(game, player1, food1)
+
+                # perform random actions based on agent.epsilon, or choose the action
+                if random.uniform(0, 1) < agent.epsilon:
+                    final_move = np.eye(3)[randint(0,2)]
+                else:
+                    # predict action based on the old state
+                    with torch.no_grad():
+                        state_old_tensor = torch.tensor(state_old.reshape((1, 4)), dtype=torch.float32).to(DEVICE)
+                        prediction = agent(state_old_tensor)
+                        final_move = np.eye(3)[np.argmax(prediction.detach().cpu().numpy()[0])]
+                        # print("Prediction")
+                        # print(final_move)
+                player1.do_move(final_move, player1.x, player1.y, game, food1, agent)
+                state_new = agent.get_state(game, player1, food1)
+
+                # set reward for the new state
+                reward = agent.set_reward(player1, game.crash)
                 
-            if params['train']:
-                # train short memory base on the new action and state
-                agent.train_short_memory(state_old, final_move, reward, state_new, game.crash)
-                # store the new data into a long term memory
-                agent.remember(state_old, final_move, reward, state_new, game.crash)
+                # if food is eaten, steps is set to 0
+                if reward > 0:
+                    steps = 0
+                    
+                if params['train']:
+                    # train short memory base on the new action and state
+                    agent.train_short_memory(state_old, final_move, reward, state_new, game.crash)
+                    # store the new data into a long term memory
+                    agent.remember(state_old, final_move, reward, state_new, game.crash)
 
-            record = get_record(game.score, record)
+                record = get_record(game.score, record)
             if params['display']:
                 display(player1, player2,food1, game, record)
                 pygame.time.wait(params['speed'])
@@ -451,7 +461,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     params = define_parameters()
     parser.add_argument("--display", nargs='?', type=distutils.util.strtobool, default=True)
-    parser.add_argument("--speed", nargs='?', type=int, default=50)
+    parser.add_argument("--speed", nargs='?', type=int, default=100)
     parser.add_argument("--bayesianopt", nargs='?', type=distutils.util.strtobool, default=False)
     args = parser.parse_args()
     print("Args", args)
@@ -459,15 +469,25 @@ if __name__ == '__main__':
     params['speed'] = args.speed
     params['display'] = args.display
     params['speed'] = args.speed
-    if args.bayesianopt:
-        bayesOpt = BayesianOptimizer(params)
-        bayesOpt.optimize_RL()
-    if params['train']:
-        print("Training...")
-        params['load_weights'] = False   # when training, the network is not pre-trained
-        run(params)
-    if params['test']:
-        print("Testing...")
-        params['train'] = False
-        params['load_weights'] = True
-        run(params)
+    SERVER_HOST = "10.23.70.159"
+    SERVER_PORT = 12345
+    c = ModbusClient()
+    c.host(SERVER_HOST)
+    c.port(SERVER_PORT)
+    while True:
+        if not c.is_open():
+                    if not c.open():
+                        print("unable to connect to "+SERVER_HOST+":"+str(SERVER_PORT))
+        if c.is_open():
+            if args.bayesianopt:
+                bayesOpt = BayesianOptimizer(params)
+                bayesOpt.optimize_RL()
+            if params['train']:
+                print("Training...")
+                params['load_weights'] = False   # when training, the network is not pre-trained
+                run(params)
+            if params['test']:
+                print("Testing...")
+                params['train'] = False
+                params['load_weights'] = True
+                run(params)
