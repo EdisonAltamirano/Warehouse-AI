@@ -342,7 +342,7 @@ def run(params):
     record = 0
     total_score = 0
     info = {"stop": False,"robot1":"player1"}
-    SERVER_HOST = "10.23.70.159"
+    SERVER_HOST = "10.22.240.51"
     SERVER_PORT = 12345
     c = ModbusClient()
     c.host(SERVER_HOST)
@@ -469,7 +469,7 @@ if __name__ == '__main__':
     params['speed'] = args.speed
     params['display'] = args.display
     params['speed'] = args.speed
-    SERVER_HOST = "10.23.70.159"
+    SERVER_HOST = "10.22.240.51"
     SERVER_PORT = 12345
     c = ModbusClient()
     c.host(SERVER_HOST)
