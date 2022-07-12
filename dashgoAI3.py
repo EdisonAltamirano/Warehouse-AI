@@ -25,9 +25,7 @@ import threading
 import time
 # cred = credentials.Certificate("google_services.json")
 # firebase_admin.initialize_app(cred)
-
 DEVICE = 'cpu' # 'cuda' if torch.cuda.is_available() else 'cpu'
-
 #################################
 #   Define parameters manually #
 #################################
@@ -56,9 +54,16 @@ class Game:
     """ Initialize PyGAME """
     
     def __init__(self, game_width, game_height):
-        pygame.display.set_caption('SnakeGen')
+        pygame.display.set_caption('WarehouseAI')
+        self.Icon = pygame.image.load('img/LogoSF.jpg')
+        pygame.display.set_icon(self.Icon)
         self.game_width = game_width
         self.game_height = game_height
+        #Mission array -> [0]=pygame, [1]=RobotCoordinate
+        #11->Negative
+        #10->Positive
+        self.missions = [[[584,176],[11412,10106]],[[355,175],[10212,10078]],[[528,405],[11206,10717]]]
+        self.charging_station = [[[681,302],[11591,10534]]]
         self.gameDisplay = pygame.display.set_mode((game_width, game_height + 60))
         self.bg = pygame.image.load("img/background1.png")
         self.crash = False
@@ -73,7 +78,7 @@ class Game:
 class Player(object):
     def __init__(self, game):
         x = random.uniform(0.1,0.9) * game.game_width
-        y = random.uniform(0.1,0.9) * game.game_height
+        y = random.uniform(0.1,0.9) * game.game_height - 30
         self.x = x - x % 20
         self.y = y - y % 20
         self.position = []
@@ -83,7 +88,6 @@ class Player(object):
         self.image = pygame.image.load('img/snakeBody.png')
         self.x_change = 20
         self.y_change = 0
-        self.battery=100
         self.robot_status="Free"
         self.status=3
         # cred = credentials.Certificate("google_services.json")
@@ -96,8 +100,11 @@ class Player(object):
         #5: RobotStatus 0-Charging, 1:Moving, 2:Free,3-Success,4-Failure
         #6: Distance
         self.inforobot=[0,0,0,0,0,0]
-        self.objectives=[[6563,2330],[13525,3526]]
-        self.charge=[7054,5836]
+        self.battery=100
+        self.objectives=[]
+        for i in game.missions:
+            self.objectives.append([game.missions[1][0],game.missions[1][1]])
+        self.charge=game.charging_station[0][1]
         self.changeobjective=0
 
     def update_position(self, x, y):
@@ -139,8 +146,8 @@ class Player(object):
             self.inforobot[0]=1
             #Goalx,y
             if self.changeobjective<=1:
-                self.inforobot[1]=self.objectives[0][0]
-                self.inforobot[2]=self.objectives[0][1]
+                self.inforobot[1]=food.x_robotfood
+                self.inforobot[2]=food.y_robotfood
                 if self.changeobjective==1:
                     self.changeobjective=0
 
@@ -198,8 +205,13 @@ class Player(object):
 
 class Food(object):
     def __init__(self,game):
-        self.x_food = random.uniform(0.1,0.9)* game.game_width
-        self.y_food = random.uniform(0.1,0.9)* game.game_height
+        #self.x_food = random.uniform(0.1,0.9)* game.game_width
+        #self.y_food = random.uniform(0.1,0.9)* game.game_height
+        self.pyrandom = random.choice(game.missions)
+        self.x_food = self.pyrandom[0][0]
+        self.y_food = self.pyrandom[0][1]
+        self.x_robotfood=self.pyrandom[1][0]
+        self.y_robotfood=self.pyrandom[1][1]
         self.image = pygame.image.load('img/food2.png')
 
     def food_coord(self, game, player):
@@ -232,8 +244,8 @@ def get_record(score, record):
 
 
 def display_ui(game, score, record,player1):
-    myfont = pygame.font.SysFont('Segoe UI', 20)
-    myfont_bold = pygame.font.SysFont('Segoe UI', 20, True)
+    myfont = pygame.font.SysFont('Warehouse AI', 20)
+    myfont_bold = pygame.font.SysFont('Warehouse AI', 20, True)
     text_score = myfont.render('SCORE: ', True, (0, 0, 0))
     text_score_number = myfont.render(str(score), True, (0, 0, 0))
     text_highest = myfont.render('HIGHEST SCORE: ', True, (0, 0, 0))
@@ -254,10 +266,10 @@ def display_ui(game, score, record,player1):
     game.gameDisplay.blit(battery_number, (470, 540))
     game.gameDisplay.blit(text_status, (540, 540))
     game.gameDisplay.blit(text_status_number, (615, 540))
-    game.gameDisplay.blit(game_status, (590, 540))
-    game.gameDisplay.blit(game_status_number, (655, 540))
-    game.gameDisplay.blit(steps_status, (640, 540))
-    game.gameDisplay.blit(steps_status_number, (700, 540))
+    game.gameDisplay.blit(game_status, (45, 570))
+    game.gameDisplay.blit(game_status_number, (120, 570))
+    game.gameDisplay.blit(steps_status, (190, 570))
+    game.gameDisplay.blit(steps_status_number, (350, 570))
     game.gameDisplay.blit(game.bg, (10, 10))
 
 
@@ -349,12 +361,15 @@ def run(params):
     c.port(SERVER_PORT)
     # thread = threading.Thread(target=worker, args=(info,))
     while counter_games < params['episodes']and total_score<=200:
+        '''
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 quit()
+        '''        
         # Initialize classes
-        game = Game(760, 540)
+        #game = Game(760, 540)
+        game = Game(760, 570)
         player1 = game.player
         player2 = game.player2
         food1 = game.food
@@ -373,13 +388,16 @@ def run(params):
                 if not c.open():
                     print("unable to connect to "+SERVER_HOST+":"+str(SERVER_PORT))
             if c.is_open():
+                for event in pygame.event.get():
+                    if event.type == pygame.MOUSEBUTTONUP:  # or MOUSEBUTTONDOWN depending on what you want.
+                        print(event.pos)
                 #Read Battery / RobotStatus /Distance (Modbus)
                 bits = c.read_holding_registers(0, 6)
-                player1.inforobot[3] = bits[3]
+                player1.inforobot[3]=bits[3]
                 player1.inforobot[4] = bits[4]
                 player1.inforobot[5] = bits[5]
                 time.sleep(1)
-                print(bits)
+                #print(bits)
                 #Update registers MissionStatus,Goalx,Goaly
                 c.write_multiple_registers(0,[player1.inforobot[0],player1.inforobot[1],player1.inforobot[2]])
                 time.sleep(1)
