@@ -65,7 +65,7 @@ class Game:
         #10->Positive
         self.missions = [[[584,176],[11412,10106]],[[355,175],[10212,10078]],[[528,405],[11206,10717]]]
         self.charging_station = [[[681,302],[11591,10534]]]
-        self.modula_coord = [[[681,302],[11591,10534]]]
+        self.modula_coord = [[[160,377],[11591,10534]]]
         self.gameDisplay = pygame.display.set_mode((game_width, game_height + 60))
         self.bg = pygame.image.load("img/background1.png")
         self.crash = False
