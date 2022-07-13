@@ -102,6 +102,7 @@ class Player(object):
         #5: RobotStatus 0-Charging, 1:Moving, 2:Free,3-Success,4-Failure
         #6: Distance
         self.inforobot=[0,0,0,0,0,0]
+        self.pick_material=-1
         self.battery=100
         self.objectives=[]
         for i in game.missions:
@@ -152,10 +153,15 @@ class Player(object):
             self.inforobot[0]=1
             #Goalx,y
             if self.changeobjective<=1:
-                if len(dict_resp)>0:
+                if self.pick_material==1:
+                    self.pick_material=2
+                    requests.post('http://10.22.229.191/Modula/api/ConfirmarPicking')
+
+                if len(dict_resp)>0 :
                     #Update XArm coordinates movement
                     self.inforobot[1]=self.modula_coord[0]
                     self.inforobot[2]=self.modula_coord[1]
+                    self.pick_material=1
                 else:
                     self.inforobot[1]=food.x_robotfood
                     self.inforobot[2]=food.y_robotfood
