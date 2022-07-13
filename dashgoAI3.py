@@ -130,7 +130,11 @@ class Player(object):
             #print("Comiiii")
         #Modula Priority , change coordinate 
         modula_resp = requests.get('http://10.22.229.191/Modula/api/Picking')
-        dict_resp=modula_resp.json()
+        try:
+            dict_resp=modula_resp.json()
+        except:
+            dict_resp={}
+
         if np.array_equal(move, [0, 0, 1]):
             # print("Free robot")
             self.inforobot[0]=2
