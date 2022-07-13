@@ -23,6 +23,7 @@ import time
 import logging
 import threading
 import time
+import requests
 # cred = credentials.Certificate("google_services.json")
 # firebase_admin.initialize_app(cred)
 DEVICE = 'cpu' # 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -64,6 +65,7 @@ class Game:
         #10->Positive
         self.missions = [[[584,176],[11412,10106]],[[355,175],[10212,10078]],[[528,405],[11206,10717]]]
         self.charging_station = [[[681,302],[11591,10534]]]
+        self.modula_coord = [[[681,302],[11591,10534]]]
         self.gameDisplay = pygame.display.set_mode((game_width, game_height + 60))
         self.bg = pygame.image.load("img/background1.png")
         self.crash = False
@@ -105,6 +107,7 @@ class Player(object):
         for i in game.missions:
             self.objectives.append([game.missions[1][0],game.missions[1][1]])
         self.charge=game.charging_station[0][1]
+        self.modula_coord=game.modula_coord[0][1]
         self.changeobjective=0
 
     def update_position(self, x, y):
@@ -124,6 +127,9 @@ class Player(object):
             self.eaten = False
             self.food = self.food + 1
             #print("Comiiii")
+        #Modula Priority , change coordinate 
+        modula_resp = requests.get()
+        dict_resp=modula_resp.json()
         if np.array_equal(move, [0, 0, 1]):
             # print("Free robot")
             self.inforobot[0]=2
@@ -146,8 +152,13 @@ class Player(object):
             self.inforobot[0]=1
             #Goalx,y
             if self.changeobjective<=1:
-                self.inforobot[1]=food.x_robotfood
-                self.inforobot[2]=food.y_robotfood
+                if len(dict_resp)>0:
+                    #Update XArm coordinates movement
+                    self.inforobot[1]=self.modula_coord[0]
+                    self.inforobot[2]=self.modula_coord[1]
+                else:
+                    self.inforobot[1]=food.x_robotfood
+                    self.inforobot[2]=food.y_robotfood
                 if self.changeobjective==1:
                     self.changeobjective=0
 
