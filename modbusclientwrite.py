@@ -1,7 +1,7 @@
 from pyModbusTCP.client import ModbusClient
 import time
 
-SERVER_HOST = "127.0.0.1"
+SERVER_HOST = "10.22.240.51"
 SERVER_PORT = 12345
 
 c = ModbusClient()
@@ -28,13 +28,13 @@ while True:
         print("write bits")
         print("----------")
         print("")
-        for addr in range(4):
-            is_ok = c.write_single_register(addr, toggle)
-            if is_ok:
-                print("bit #" + str(addr) + ": write to " + str(toggle))
-            else:
-                print("bit #" + str(addr) + ": unable to write " + str(toggle))
-            time.sleep(0.5)
+        #for addr in range(4):
+        is_ok = c.write_multiple_registers(0, [1,2,3,4,5,6,7,8])
+        if is_ok:
+            print("bit #" + str(0) + ": write to " + str(toggle))
+        else:
+            print("bit #" + str(0) + ": unable to write " + str(toggle))
+        time.sleep(0.5)
 
         time.sleep(1)
 

@@ -49,11 +49,10 @@ def define_parameters():
     params['plot_score'] = True
     params['log_path'] = 'logs/scores_' + str(datetime.datetime.now().strftime("%Y%m%d%H%M%S")) +'.txt'
     return params
-
-
+def mapping(x,game,ros):
+    return (x*game)/ros
 class Game:
-    """ Initialize PyGAME """
-    
+    """ Initialize PyGAME """    
     def __init__(self, game_width, game_height):
         pygame.display.set_caption('WarehouseAI')
         self.Icon = pygame.image.load('img/LogoSF.jpg')
@@ -101,7 +100,13 @@ class Player(object):
         #4: Battery
         #5: RobotStatus 0-Charging, 1:Moving, 2:Free,3-Success,4-Failure
         #6: Distance
-        self.inforobot=[0,0,0,0,0,0]
+        #7: Locationx robot
+        #8: Locationy robot
+        #9: Goalxpi robot
+        #10: Goalypi robot
+        #11: Locationxpi robot
+        #12: Locationypi robot
+        self.inforobot=[0,0,0,0,0,0,0,0,0,0,0,0]
         self.pick_material=-1
         self.battery=100
         self.objectives=[]
@@ -177,7 +182,7 @@ class Player(object):
             #Assume time navigationSS
             #Reduce Battery
             #Update location to objective if success 
-            if(self.inforobot[5]==3):
+            if(self.inforobot[4]==3):
                 self.x = food.x_food -20    
                 self.y = food.y_food -20 
 
@@ -233,13 +238,25 @@ class Food(object):
         self.y_food = self.pyrandom[0][1]
         self.x_robotfood=self.pyrandom[1][0]
         self.y_robotfood=self.pyrandom[1][1]
+        #Goal Robot x,y
+        game.player.inforobot[1] = self.x_robotfood
+        game.player.inforobot[2] = self.y_robotfood
+        #PI /Locationx,y
+        game.player.inforobot[8] = self.x_food
+        game.player.inforobot[9] = game.game_height-self.y_food
+
         self.image = pygame.image.load('img/food2.png')
 
     def food_coord(self, game, player):
-        x_rand = randint(20, game.game_width - 40)
-        self.x_food = x_rand - x_rand % 20
-        y_rand = randint(20, game.game_height - 40)
-        self.y_food = y_rand - y_rand % 20
+        pyrandom = random.choice(game.missions)
+        self.x_food = pyrandom[0][0]
+        self.y_food = pyrandom[0][1]
+        #Goal Robot x,y
+        game.player.inforobot[1] = pyrandom[1][0]
+        game.player.inforobot[2] = pyrandom[1][1]
+        #PI /Locationx,y
+        game.player.inforobot[8] = self.x_food
+        game.player.inforobot[9] = game.game_height-self.y_food
         if [self.x_food, self.y_food] not in player.position:
             return self.x_food, self.y_food
         else:
@@ -413,18 +430,32 @@ def run(params):
                     if event.type == pygame.MOUSEBUTTONUP:  # or MOUSEBUTTONDOWN depending on what you want.
                         print(event.pos)
                 #Read Battery / RobotStatus /Distance (Modbus)
-                bits = c.read_holding_registers(0, 6)
+                bits = c.read_holding_registers(0, 12)
                 player1.inforobot[3]=bits[3]
                 player1.inforobot[4] = bits[4]
                 player1.inforobot[5] = bits[5]
+
+                #Map coordinate location to pi
+                theta = np.radians(13)
+                offsetx=7.9115512
+                offsety=2.50132282
+                rheight=11.29203556
+                rwidth=17.69995916
+                c1, s = np.cos(theta), np.sin(theta)
+                R = np.array(((c1, -s), (s, c1)))
+                #Convert bit +-
+                player1.inforobot[10]=int(mapping(bits[6]+offsetx,game.game_width,rwidth))
+                player1.inforobot[11]=int(mapping(bits[7]+offsety,game.game_height,rheight))
+
                 time.sleep(1)
                 #print(bits)
                 #Update registers MissionStatus,Goalx,Goaly
                 c.write_multiple_registers(0,[player1.inforobot[0],player1.inforobot[1],player1.inforobot[2]])
+                c.write_multiple_registers(8,[player1.inforobot[8],player1.inforobot[9],player1.inforobot[10],player1.inforobot[11]])
                 time.sleep(1)
             game.steps = steps
             # perform new move and get new state
-            if player1.inforobot[5] == 3 or player1.inforobot[5]==4 or steps==0:#Failure or success then other move and set step to 0
+            if player1.inforobot[4] == 3 or player1.inforobot[4]==4 or steps==0:#Failure or success then other move and set step to 0
                 if not params['train']:
                     agent.epsilon = 0.1
                 else:
