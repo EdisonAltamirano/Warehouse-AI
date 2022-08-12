@@ -107,6 +107,7 @@ class Player(object):
         #11: Locationxpi robot
         #12: Locationypi robot
         self.inforobot=[0,0,0,0,0,0,0,0,0,0,0,0]
+        self.prevx_robot=-1
         self.pick_material=-1
         self.battery=100
         self.objectives=[]
@@ -114,7 +115,7 @@ class Player(object):
             self.objectives.append([game.missions[1][0],game.missions[1][1]])
         self.charge=game.charging_station[0][1]
         self.modula_coord=game.modula_coord[0][1]
-        self.changeobjective=0
+        #self.changeobjective=0
 
     def update_position(self, x, y):
         # if self.position[-1][0] != x or self.position[-1][1] != y:
@@ -134,8 +135,8 @@ class Player(object):
             self.food = self.food + 1
             #print("Comiiii")
         #Modula Priority , change coordinate 
-        modula_resp = requests.get('http://10.22.229.191/Modula/api/Picking')
         try:
+            modula_resp = requests.get('http://10.22.229.191/Modula/api/Picking')
             dict_resp=modula_resp.json()
         except:
             dict_resp={}
@@ -161,22 +162,19 @@ class Player(object):
             #Moving robot
             self.inforobot[0]=1
             #Goalx,y
-            if self.changeobjective<=1:
-                if self.pick_material==1:
-                    self.pick_material=2
-                    requests.post('http://10.22.229.191/Modula/api/ConfirmarPicking')
+            
+            if self.pick_material==1:
+                self.pick_material=2
+                requests.post('http://10.22.229.191/Modula/api/ConfirmarPicking')
 
-                if len(dict_resp)>0 :
-                    #Update XArm coordinates movement
-                    self.inforobot[1]=self.modula_coord[0]
-                    self.inforobot[2]=self.modula_coord[1]
-                    self.pick_material=1
-                else:
-                    self.inforobot[1]=food.x_robotfood
-                    self.inforobot[2]=food.y_robotfood
-                if self.changeobjective==1:
-                    self.changeobjective=0
-
+            if len(dict_resp)>0 :
+                #Update XArm coordinates movement
+                self.inforobot[1]=self.modula_coord[0]
+                self.inforobot[2]=self.modula_coord[1]
+                self.pick_material=1
+            else:
+                self.inforobot[1]=food.x_robotfood
+                self.inforobot[2]=food.y_robotfood
 
             self.image=pygame.image.load('img/snakeBody.png')
             #Assume time navigationSS
@@ -234,6 +232,8 @@ class Food(object):
         #self.x_food = random.uniform(0.1,0.9)* game.game_width
         #self.y_food = random.uniform(0.1,0.9)* game.game_height
         self.pyrandom = random.choice(game.missions)
+        self.prevx_robotfood=-1
+        #self.prevy_coord=-1
         self.x_food = self.pyrandom[0][0]
         self.y_food = self.pyrandom[0][1]
         self.x_robotfood=self.pyrandom[1][0]
@@ -450,7 +450,13 @@ def run(params):
                 time.sleep(1)
                 #print(bits)
                 #Update registers MissionStatus,Goalx,Goaly
-                c.write_multiple_registers(0,[player1.inforobot[0],player1.inforobot[1],player1.inforobot[2]])
+                if(player1.inforobot[4]==3 and player1.inforobot[1]!=player1.prevx_robot):
+                    c.write_multiple_registers(0,[1,player1.inforobot[1],player1.inforobot[2],player1.inforobot[3],9])
+                    player1.prevx_robot=player1.inforobot[1]
+                    player1.inforobot[4]=9
+                else:
+                    c.write_multiple_registers(0,[player1.inforobot[0],player1.inforobot[1],player1.inforobot[2]])
+                    
                 c.write_multiple_registers(8,[player1.inforobot[8],player1.inforobot[9],player1.inforobot[10],player1.inforobot[11]])
                 time.sleep(1)
             game.steps = steps

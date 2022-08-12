@@ -29,15 +29,14 @@ while True:
         print("----------")
         print("")
         #for addr in range(4):
-        is_ok = c.write_multiple_registers(0, [1,2,3,4,5,6,7,8])
+        is_ok = c.write_multiple_registers(0, [1])
         if is_ok:
             print("bit #" + str(0) + ": write to " + str(toggle))
         else:
             print("bit #" + str(0) + ": unable to write " + str(toggle))
         time.sleep(0.5)
-
+        '''
         time.sleep(1)
-
         print("")
         print("read bits")
         print("---------")
@@ -47,7 +46,7 @@ while True:
             print("bits #0 to 3: "+str(bits))
         else:
             print("unable to read")
-
+        '''
     toggle = not toggle
     # sleep 2s before next polling
     time.sleep(2)

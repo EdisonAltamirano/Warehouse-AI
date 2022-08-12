@@ -13,8 +13,8 @@ try:
     state = [0]
     while True:
         #DataBank.set_words(0, [int(uniform(0, 100))])
-        if state != DataBank.get_words(0,12):
-            state = DataBank.get_words(0,12)
+        if state != DataBank.get_words(0,25):
+            state = DataBank.get_words(0,25)
             print("Value of Registers has changed to " +str(state))
         sleep(0.5)
 
